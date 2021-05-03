@@ -1,31 +1,29 @@
-import java.awt.Image;
 import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Scanner;
 import java.awt.Color;
 
 import javax.imageio.ImageIO;
-import javax.sound.midi.Soundbank;
 
 public class Main {
     
     public static void main(String[] args) throws Exception {
-        boolean running = true;
         Scanner scanner = new Scanner(System.in);
 
         BufferedImage img = null;
+        System.out.println("Enter filename: ");
+        String fileName = scanner.next();
         try {
-            img = ImageIO.read(new File("dream.jpg"));
+            img = ImageIO.read(new File(fileName));
         } catch (IOException e){
             
         }
 
-        while(running) {
+        
             System.out.println("Blackout [b] or segment [s] image? ");
             String choice = scanner.next();
 
@@ -36,11 +34,7 @@ public class Main {
                 System.out.println("Enter k: ");
                 int choice2 = scanner.nextInt();
                 imageSegmentation(img, choice2);
-            }
-            else {
-                running = false;
-            }
-        }
+            } 
         scanner.close();
         
        
@@ -90,30 +84,45 @@ public static void imageSegmentation(BufferedImage img, int k) throws IOExceptio
     int count = 0;
     for(GraphEdge currentEdge : edgeArray) {
         
-        PixelNode pixelOneParent = d.findSet(currentEdge.getA());
-        PixelNode pixelTwoParent = d.findSet(currentEdge.getB());
-        if(!(pixelOneParent.toCoords().equalsIgnoreCase(pixelTwoParent.toCoords()))) {
-            long thresholdOne = d.getInternalDiff(pixelOneParent) + (k/d.getCardinality(pixelOneParent));
-            long thresholdTwo = d.getInternalDiff(pixelTwoParent) + (k/d.getCardinality(pixelTwoParent));
+        SetRep pixelOneParent = d.findSet(currentEdge.getA().toCoords());
+        SetRep pixelTwoParent = d.findSet(currentEdge.getB().toCoords());
+        int internalDiffOne = pixelOneParent.getSetRepInternalDiff();
+        int internalDiffTwo = pixelTwoParent.getSetRepInternalDiff();
+
+        if(!(pixelOneParent.getSetRepCoords().equalsIgnoreCase(pixelTwoParent.getSetRepCoords()))) {
+            long thresholdOne = internalDiffOne + (k/pixelOneParent.getSetRepCardinality());
+            long thresholdTwo = internalDiffTwo + (k/pixelTwoParent.getSetRepCardinality());
             int dif = currentEdge.getIntensityDifference();
 
+            //different calls to union based on what will be the new maximum internal difference
             if(dif <= thresholdOne && dif <= thresholdTwo) {
                 count++;
-                d.union(currentEdge.getA(), currentEdge.getB(), dif);
+                //case 1: Edge A's MInt becomes the new MInt
+                if(internalDiffOne > dif && internalDiffOne > internalDiffTwo) { 
+                   d.union(currentEdge.getA().toCoords(), currentEdge.getB().toCoords(), internalDiffOne); 
+                }
+                //case 2: Edge B's MInt becomes the new MInt 
+                else if (internalDiffTwo > dif && internalDiffTwo > internalDiffOne) {
+                    d.union(currentEdge.getA().toCoords(), currentEdge.getB().toCoords(), internalDiffTwo);
+                } else { //case 3: the external difference becomes the new MInt
+                    d.union(currentEdge.getA().toCoords(), currentEdge.getB().toCoords(), dif);
+                }
             }
 
         }
     }
-    System.out.println("count: " + count);
+    System.out.println("Union count: " + count);
 
     for(int a = 0; a < numRows; a++) {
         for(int b = 0; b < numCols; b++) {
             PixelNode currentVertex = new PixelNode(a, b,new Color(img.getRGB(b, a)));
-            img.setRGB(b, a, d.getColor(d.findSet(currentVertex)));
+            SetRep cVertexParent = d.findSet(currentVertex.toCoords());
+            img.setRGB(b, a, cVertexParent.getSetRepColor().getRGB());
+           
         }
     }
     
-    File outputfile = new File("output2.jpg");
+    File outputfile = new File("imagesegmentation.jpg");
     ImageIO.write(img, "jpg", outputfile);
     System.out.println("Finished.");
 
@@ -131,7 +140,7 @@ public static void blackoutTop(BufferedImage img) throws IOException {
         }
 
         
-    File outputfile = new File("output.jpg");
+    File outputfile = new File("greenout.jpg");
     ImageIO.write(img, "jpg", outputfile);
     
   }
